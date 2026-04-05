@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ShopStatus {
+  ACTIVE
+  PAUSED
+  UNINSTALLED
+}
+
+enum ShippingRequestStatus {
+  OPEN
+  OFFERED
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+  PACKAGE_CREATED
+  FAILED
+}
+
+enum ShipmentJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Shop {
+  id                   String                @id @default(cuid())
+  eshopId              Int                   @unique
+  domain               String                @unique
+  name                 String?
+  status               ShopStatus            @default(ACTIVE)
+  oauthAccessToken     String
+  webhookSignatureKey  String?
+  shoptetApiBaseUrl    String?
+  boxpiCarrier         String?
+  boxpiCountry         String?
+  shippingMethodCode   String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  shippingRequests     ShippingRequest[]
+  webhookNotifications WebhookNotification[]
+}
+
+model ShippingRequest {
+  id                    String                @id @default(cuid())
+  shopId                String
+  shop                  Shop                  @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shippingRequestCode   String
+  shippingGuid          String
+  verificationCode      String?
+  orderCode             String?
+  orderGuid             String?
+  status                ShippingRequestStatus @default(OPEN)
+  expiresAt             DateTime?
+  selectedPickupPointId String?
+  selectedPickupRaw     Json?
+  quotedPriceVatIncl    Decimal?              @db.Decimal(10, 2)
+  quotedCurrency        String?
+  boxpiPackageId        String?
+  boxpiTrackingCode     String?
+  boxpiLabelUrl         String?
+  lastError             String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  @@unique([shippingRequestCode, shippingGuid])
+}
+
+model WebhookNotification {
+  id            String   @id @default(cuid())
+  shopId        String?
+  shop          Shop?    @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  event         String
+  eventInstance String
+  payload       Json
+  processed     Boolean  @default(false)
+  error         String?
+  createdAt     DateTime @default(now())
+  processedAt   DateTime?
+  @@unique([event, eventInstance])
+}
+
+model ShipmentJob {
+  id                String            @id @default(cuid())
+  shippingRequestId String            @unique
+  status            ShipmentJobStatus @default(PENDING)
+  attempts          Int               @default(0)
+  lastError         String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
